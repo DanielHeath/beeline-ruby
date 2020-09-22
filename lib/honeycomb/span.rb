@@ -41,6 +41,7 @@ module Honeycomb
                       is_root: parent_id.nil?,
                       sample_hook: nil,
                       presend_hook: nil,
+                      sample_excludes_child_spans: nil,
                       **_options)
       @parent = parent
       # parent_id should be removed in the next major version bump. It has been
@@ -50,6 +51,7 @@ module Honeycomb
       @is_root = is_root
       @presend_hook = presend_hook
       @sample_hook = sample_hook
+      @sample_excludes_child_spans = sample_excludes_child_spans
     end
 
     def create_child
@@ -59,7 +61,8 @@ module Honeycomb
                      parent: self,
                      parent_id: id,
                      sample_hook: sample_hook,
-                     presend_hook: presend_hook).tap do |c|
+                     presend_hook: presend_hook,
+                     sample_excludes_child_spans: nil).tap do |c|
         children << c
       end
     end
@@ -77,6 +80,11 @@ module Honeycomb
 
       add_field "meta.sent_by_parent", true
       send_internal
+    end
+
+    def skip_sending
+      children.each &:skip_sending
+      mark_sent!
     end
 
     def remove_child(child)
@@ -104,9 +112,15 @@ module Honeycomb
       @is_root
     end
 
+    def mark_sent!
+      @sent = true
+      context.span_sent(self)
+
+      parent && parent.remove_child(self)
+    end
+
     def send_internal
       add_additional_fields
-      send_children
       sample = true
       if sample_hook.nil?
         sample = should_sample(event.sample_rate, trace.id)
@@ -114,14 +128,17 @@ module Honeycomb
         sample, event.sample_rate = sample_hook.call(event.data)
       end
 
+      unless @sample_excludes_child_spans && !sample
+        send_children
+      else
+        skip_children
+      end
+
       if sample
         presend_hook && presend_hook.call(event.data)
         event.send_presampled
       end
-      @sent = true
-      context.span_sent(self)
-
-      parent && parent.remove_child(self)
+      mark_sent!
     end
 
     def add_additional_fields
@@ -138,6 +155,12 @@ module Honeycomb
     def send_children
       children.each do |child|
         child.send_by_parent
+      end
+    end
+
+    def skip_children
+      children.each do |child|
+        child.skip_sending
       end
     end
 

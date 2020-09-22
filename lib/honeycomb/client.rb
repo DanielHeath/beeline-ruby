@@ -35,8 +35,8 @@ module Honeycomb
       @additional_trace_options = {
         presend_hook: configuration.presend_hook,
         sample_hook: configuration.sample_hook,
+        sample_excludes_child_spans: configuration.sample_excludes_child_spans,
       }
-
       configuration.after_initialize(self)
 
       at_exit do
