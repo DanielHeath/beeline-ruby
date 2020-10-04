@@ -91,6 +91,21 @@ module Honeycomb
       children.delete child
     end
 
+    def sampling_says_send?
+      if @sample_excludes_child_spans && parent
+        return parent.sampling_says_send?
+      end
+
+      if @sampling_says_send == nil
+        if sample_hook.nil?
+          @sampling_says_send = should_sample(event.sample_rate, trace.id)
+        else
+          @sampling_says_send, event.sample_rate = sample_hook.call(event.data)
+        end
+      end
+      @sampling_says_send
+    end
+
     private
 
     INVALID_SPAN_ID = ("00" * 8)
@@ -121,12 +136,7 @@ module Honeycomb
 
     def send_internal
       add_additional_fields
-      sample = true
-      if sample_hook.nil?
-        sample = should_sample(event.sample_rate, trace.id)
-      else
-        sample, event.sample_rate = sample_hook.call(event.data)
-      end
+      sample = sampling_says_send?
 
       unless @sample_excludes_child_spans && !sample
         send_children
