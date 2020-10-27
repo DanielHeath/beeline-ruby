@@ -62,7 +62,7 @@ module Honeycomb
                      parent_id: id,
                      sample_hook: sample_hook,
                      presend_hook: presend_hook,
-                     sample_excludes_child_spans: nil).tap do |c|
+                     sample_excludes_child_spans: @sample_excludes_child_spans).tap do |c|
         children << c
       end
     end
