@@ -91,6 +91,11 @@ module Honeycomb
       children.delete child
     end
 
+    def span_ancestors
+      return [] unless parent
+      parent.span_ancestors + [parent]
+    end
+
     def sampling_says_send?
       if @sample_excludes_child_spans && parent
         return parent.sampling_says_send?
@@ -137,6 +142,7 @@ module Honeycomb
     def send_internal
       add_additional_fields
       sample = sampling_says_send?
+      puts " * " + (" " * span_ancestors.length) + "- " + event.data['name'] + "(#{sample})"
 
       unless @sample_excludes_child_spans && !sample
         send_children
