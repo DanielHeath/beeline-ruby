@@ -18,7 +18,7 @@ module Honeycomb
     def_delegators :@event, :add_field, :add
     def_delegator :@trace, :add_field, :add_trace_field
 
-    attr_reader :id, :trace
+    attr_reader :id, :trace, :parent
 
     def initialize(trace:,
                    builder:,
@@ -73,6 +73,11 @@ module Honeycomb
       send_internal
     end
 
+    def will_send_by_parent!
+      @will_send_by_parent = true
+      context.span_finished(self)
+    end
+
     protected
 
     def send_by_parent
@@ -116,7 +121,6 @@ module Honeycomb
     INVALID_SPAN_ID = ("00" * 8)
 
     attr_reader :event,
-                :parent,
                 :parent_id,
                 :children,
                 :builder,
@@ -134,7 +138,7 @@ module Honeycomb
 
     def mark_sent!
       @sent = true
-      context.span_sent(self)
+      context.span_finished(self) unless @will_send_by_parent
 
       parent && parent.remove_child(self)
     end
